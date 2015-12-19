@@ -1,73 +1,15 @@
 /// Scalenie komunikatów robotnika i firmy
-
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include <pthread.h>
-#include <sys/types.h> 
-#include <sys/ipc.h> 
+#include "komunikacja.h"
 
 // Makra do obslugi kwadratowych tablic, dzięki temu szybkie mallok i free.
 #define Szacunek(x, y) Szacunek[((x) - 1) * glembokosc + (y) - 1]
 #define Teren(x, y) Teren[((x) - 1) * glembokosc + (y) - 1]
 int dlugosc, glembokosc, oplataStala, ograniczenieA;
 int *Szacunek, *Teren;
-// Do jakiegoś pliku .h:
-
-struct kom_1_z_baku_do_firmy{
-	long adresat_komunikatu; // typ.
-	int saldo, liczba_pracownikow;
-}
-
-struct kom_do_banku{
-	long adres_banku; // typ.
-	// I - informaca o saldzie, P - wykonanie przelewu, K - rozesłanie zakończenia dla firm.
-	char jakie_zlecenie; 
-	int kto_zleca, kwota;
-	int id1, id2; // przelewy wykonywane są z id1-->id2 
-	              // muzeum ma konto o id == 0 i to konto na początku ma 0
-	              // i może zejść na poniżej 0.
-	              // Na pozostałych kontach zabronione jest zejscie ponizej 0.
-	int czy_zamykam_konto; // gdy proces kończy działanie informuje o tym bank.
-}
-
-struct kom_z_banku{
-	long adresat_komunikatu; // typ.
-	int stan_konta, akceptacja_tranzakcji;
-	int koncz_dzialalnosc;
-}
-
-struct kom_do_delegata{
-	long id_robotnika;
-	// T - żadanie terenu, R - wysłanie raportu
-	char jakie_zlecenie;
-	int nr_terenu;
-	int ilosc_wykopanych_artefaktow, wykopane_artefakty[20];
-	
-}
-
-struct kom_do_robotnika{
-	long id_robotnika;
-	// T - przyczielony teren, B - brak pozwolenia, A- akceptacja raportu
-	char jakie_zlecenie;
-	int symbol_zbioru;
-	
-}
-
-struct kom_do_muzeum{
-	long id_firmy;
-	// S- sprzedanie artyfaktów, O- oferta
-	char jakie_zlecenie;
-	int kolekcja, cena, ilosc_pol;
-}
-
-struct kom_do_firmy{
-	long id_firmy;
-	//  A - akceptacja P- dostanie pozwolenia, N-odmowa pozwolenia.
-	char jakie_zlecenie;
-	int pozwolenie;
-}
-	
-// ********************
 
 
 
