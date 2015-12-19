@@ -262,3 +262,11 @@ int main(int argc, char **argv){
 	
 	ilu_robotnikow_pracuje = liczba_pracownikow;
 	
+	/// Stworzyć jednego kierownika.
+	
+	/// Stworzyć pracowników.
+	// po stworzeniu pracowników program sam już działa ,
+	// po zakończeniu skończą działąć wszystkei procesy same.
+	
+	
+}
