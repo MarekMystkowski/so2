@@ -177,17 +177,14 @@ void pracownik(void *id){
 				// Pracuję nad wykopaliskiem wynik zapisuje na komunikacie odp.
 				PRACUJ(komunikant.symbol_zbioru, &komunikat_odp);
 				
-				// Skończyłem pracę wysyłam raport:
-				struct kom_do_delegata komunikat_odp;
-				komunikat_odp.id_robotnika = typ_komunikatu('F', id_firmy, moje_id);
+				// Skończyłem pracę wysyłam raport
 				komunikat_odp.jakie_zlecenie = 'R';
-				int x = msgsnd(ID_KOLEJKI_DELEGATOW, &komunikat_odp, sizeof(komunikat_odp),0);
+				x = msgsnd(ID_KOLEJKI_DELEGATOW, &komunikat_odp, sizeof(komunikat_odp),0);
 				if(x == -1)syserr("firma:Error in msgsnd\n");
 				
 				// Czekam na akceptacje raportu:
-				struct kom_do_robotnika komunikat;
-				int x = msgrcv(ID_KOLEJKI_ROBOTNIKOW, &komunikat, sizeof(komunikat),
-				typ_komunikatu('F', id_firmy, moje_id), 0);
+				x = msgrcv(ID_KOLEJKI_FIRM, &komunikat, sizeof(komunikat),
+						adres_firmy(id_firmy, moje_id), 0);
 				if(x == -1)syserr("firma:Error in msgrcv\n");
 				if(komunikat.jakie_zlecenie != 'A')syserr("firma:robotnik źle pracuje\n");
 				

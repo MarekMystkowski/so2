@@ -38,13 +38,13 @@ void delegat(void *id){
 				id_robotnika = id_robotnika_z_adresu(komunikat.nadawca, id_firmy);
 				ok = 1;
 				x = 1;
-				if(stan_robotnika[id_robotnika] <= 0) ok = -1;
+				if(stan_robotnika[id_robotnika] <= 0) ok = 0;
 				for(i = 0; ok && i < komunikat.ilosc_wykopanych_artefaktow; i++)
 					x *= komunikat.wykopane_artefakty[i];
-				if(x != stan_robotnika[id_robotnika]) ok = -1;
+				if(x != stan_robotnika[id_robotnika]) ok = 0;
 				
 				// odpowiadanie na raport.
-				if(x == 1)
+				if(ok)
 					komunikat_odp.jakie_zlecenie = 'A';
 					else komunikat_odp.jakie_zlecenie = 'N';
 				stan_robotnika[id_robotnika] = -1; // już nie kopie
@@ -53,13 +53,13 @@ void delegat(void *id){
 				// Prosi o teren.
 				id_robotnika = id_robotnika_z_adresu(komunikat.nadawca, id_firmy);
 				ok = 1;
-				if(stan_robotnika[id_robotnika] != -1) ok = -1; // już coś kopie.
+				if(stan_robotnika[id_robotnika] != -1) ok = 0; // już coś kopie.
 				x = glembokosc_kopania[komunikat.nr_terenu];
-				if(x == maksymalna_glebokosc) ok = -1; // głębiej nie może kopać.
-				if(ok != -1) glembokosc_kopania[komunikat.nr_terenu]++;
+				if(x == maksymalna_glebokosc) ok = 0; // głębiej nie może kopać.
+				if(ok) glembokosc_kopania[komunikat.nr_terenu]++;
 				
-				// odpowiadanie na raport.
-				if(x == 1){
+				
+				if(ok){
 					komunikat_odp.jakie_zlecenie = 'T';
 					komunikat_odp.symbol_zbioru = Teren(komunikat.nr_terenu, 
 						glembokosc_kopania[komunikat.nr_terenu]);
