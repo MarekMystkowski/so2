@@ -23,9 +23,19 @@ int ID_KOLEJKI_DELEGATOW; // kolejka do pisania do delegatów.
 int ID_KOLEJKI_BANK_MUZEUM; // kolejka między bankiem a muzeum;
 int ID_KOLEJKI_FIRM; // Kolejka do pisania dla robotników i kierowników.
 int ID_KOLEJKI_BANK_FIRMA;
-void inituj_komunikacje(char dla_kogo);
-long adres_firmy(int id_firmy, int id_robotnika);
-int id_robotnika_z_adresu(long adres, int id_firmy);
+void inituj_komunikacje(char dla_kogo){
+	ID_KOLEJKI_DELEGATOW = msgget(1, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_BANK_MUZEUM = msgget(2, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_FIRM = msgget(3, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_BANK_FIRMA = msgget(4, IPC_CREAT|S_IRWXU);
+}
+long adres_firmy(int id_firmy, int id_robotnika){
+	return (long) id_firmy * (long)1000000 + (long)id_robotnika;
+}
+int id_robotnika_z_adresu(long adres, int id_firmy){
+	return (int) (adres % 1000000);
+	
+}
 
 
 struct kom_1_z_baku_do_firmy{
@@ -34,27 +44,22 @@ struct kom_1_z_baku_do_firmy{
 };
 
 struct kom_do_banku{
-	long adres_banku; // typ.
-	// I - informaca o saldzie, P - wykonanie przelewu, K - rozesłanie zakończenia dla firm.
+	long id_konta; // typ.
+	// I - informaca o saldzie, P - wykonanie przelewu, Z - bank ma zakończyć działanie.
 	char jakie_zlecenie; 
-	int kto_zleca, kwota;
-	int id1, id2; // przelewy wykonywane są z id1-->id2 
-	              // muzeum ma konto o id == 0 i to konto na początku ma 0
-	              // i może zejść na poniżej 0.
-	              // Na pozostałych kontach zabronione jest zejscie ponizej 0.
-	int czy_zamykam_konto; // gdy proces kończy działanie informuje o tym bank.
+	int kwota, id1, id2; // przelewy wykonywane są z id1-->id2 
+
 };
 
 struct kom_z_banku{
 	long adresat_komunikatu; // typ.
 	int stan_konta, akceptacja_tranzakcji;
-	int koncz_dzialalnosc;
 };
 
 struct kom_do_delegata{
 	long id_firmy;
 	// Z- zwolnienie terenu, S- sprzedanie artyfaktów, O- oferta zezwolenia,
-	// T- prośba o teren do kopania, R- raport z wykopaliska.
+	// T- prośba o teren do kopania, R- raport z wykopaliska, K- firma kończy działalnosc.
 	char jakie_zlecenie;
 	long nadawca;
 	int kolekcja, cena, ilosc_pol;

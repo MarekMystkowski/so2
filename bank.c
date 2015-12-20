@@ -1,52 +1,27 @@
+/* Bank musi obsługiwać tylko zlecenia od Muzeum.
+ * I tylko przelewy.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/types.h> 
 #include <sys/ipc.h> 
 #include "komunikacja.h"
-int *Saldo, iloscFirm, oplataStala, ograniczenieA;
-int dzialajace_firmy, czy_muzeum_dziala;
-int *Firma_dziala;
-// Do jakiegoś pliku .h:
-
-struct kom_1_z_baku_do_firmy{
-	long adresat_komunikatu; // typ.
-	int saldo, liczba_pracownikow;
-}
-
-struct kom_do_banku{
-	long adres_banku; // typ.
-	// I - informaca o saldzie, P - wykonanie przelewu, K - rozesłanie zakończenia dla firm.
-	char jakie_zlecenie; 
-	int kto_zleca, kwota;
-	int id1, id2; // przelewy wykonywane są z id1-->id2 
-	              // muzeum ma konto o id == 0 i to konto na początku ma 0
-	              // i może zejść na poniżej 0.
-	              // Na pozostałych kontach zabronione jest zejscie ponizej 0.
-	int czy_zamykam_konto; // gdy proces kończy działanie informuje o tym bank.
-}
-
-struct kom_z_banku{
-	long adresat_komunikatu; // typ.
-	int stan_konta, akceptacja_tranzakcji;
-	int koncz_dzialalnosc;
-}
-
-
-// ********************
+int *Saldo, *LiczbaPracownikow, iloscFirm, oplataStala, ograniczenieA;
 
 int main(int argc, char **argv){
+	inituj_komunikacje('B');
 	if(argc != 4){
-		printf("BANK:Podales zla ilosc argumentow.\n");
+		printf("BANK_:Podales zla ilosc argumentow %d.\n", argc);
 		return 0;
 	}
 	
 	iloscFirm = atoi(argv[1]);
 	oplataStala = atoi(argv[2]);
 	ograniczenieA = atoi(argv[3]);
-	
+	int id, i, x;
 	 // Uruchamia wszystkie procesy firm z ich identyfikatorami.
-	 for(int id = 1; id <= iloscFirm; id++){
+	 for(id = 1; id <= iloscFirm; id++){
 		pid_t pid = fork();
 		if(pid == -1) syserr("Error in fork\n");
 		if(pid == 0){ 
@@ -58,84 +33,83 @@ int main(int argc, char **argv){
 	}
 	
 	Saldo = malloc((iloscFirm + 1) * sizeof(int));
-	Firma_dziala = malloc((iloscFirm + 1) * sizeof(int));
+	LiczbaPracownikow = malloc((iloscFirm + 1) * sizeof(int));
 	Saldo[0] = 0; // Ustalenie salda dla muzeum.
-	// Wczytanie danych i wysłanie komunikatów wstępnych dla firm:S
-	int id_firmy, poczatkowe_saldo, liczba_pracownikow;
-	for(int i = 1; i <= iloscFirm; i++){
+	// Wczytanie danych i wysłanie komunikatów wstępnych dla firm:
+	int id_firmy, poczatkowe_saldo, liczba_pracownikow, j, ok;
+	struct kom_1_z_baku_do_firmy komunikat_do_firm1;
+	for(i = 1; i <= iloscFirm; i++){
 		scanf("%d %d %d", &id_firmy, &poczatkowe_saldo, &liczba_pracownikow);
 		Saldo[id_firmy] = poczatkowe_saldo;
+		LiczbaPracownikow[id_firmy] = liczba_pracownikow;
 		
-		struct kom_1_z_baku_do_firmy komunikat;
 		// ustawienie adresata na firmę.
-		komunikat.adresat_komunikatu = typ_komunikatu('F', id_firmy, 0);
-		komunikat.saldo = poczatkowe_saldo;
-		komunikat.liczba_pracownikow = liczba_pracownikow;
-		int x = msgsnd(ID_KOLEJKI_BANKU, &komunikat, sizeof(komunikat),0);
+		komunikat_do_firm1.adresat_komunikatu =adres_firmy(id_firmy, 0);
+		komunikat_do_firm1.saldo = poczatkowe_saldo;
+		komunikat_do_firm1.liczba_pracownikow = liczba_pracownikow;
+		x = msgsnd(ID_KOLEJKI_BANK_FIRMA, &komunikat_do_firm1, 
+			sizeof(komunikat_do_firm1),0);
 		if(x == -1)syserr("bank:Error in msgsnd\n");
 	}
-	for(int i = 1; i <= iloscFirm; i++) Firma_dziala[i] = 1;
-	dzialajace_firmy = iloscFirm;
 	
+	
+	// Wysłanie wstępnych informacji do muzeum.
+	
+	// Pobranie informacji o ilości firm i ilości robotników w każdej firmie.
+	struct kom_1_z_banku_do_muzeum komunikat_do_muzeum1;
+	komunikat_do_muzeum1.ilosc_firm = iloscFirm;
+	komunikat_do_muzeum1.nr_porcja = 1;
+	komunikat_do_muzeum1.rozmiar_porcji = 10000;
+	
+	i = 0;
+	while(i * komunikat_do_muzeum1.rozmiar_porcji < iloscFirm){
+		for(j = 0; komunikat_do_muzeum1.rozmiar_porcji * i + j + 1
+				<= iloscFirm && j < komunikat_do_muzeum1.rozmiar_porcji; j++)
+			komunikat_do_muzeum1.dane[j] = 
+				LiczbaPracownikow[komunikat_do_muzeum1.rozmiar_porcji * i + j + 1] ;
+
+		x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_muzeum1,
+				sizeof(komunikat_do_muzeum1), 0);
+		if(x == -1)syserr("bank:Error in msgsnd\n");
+		i++;
+	}
+	
+	
+	
+	ok = 1;
+	struct kom_z_banku komunikat_odp;
+	struct kom_do_banku komunikat;
 	// obsluga kont:
-	while(1){
-		kom_do_banku komunikat;
-		int x = msgrcv(ID_KOLEJKI_BANKU, &komunikat, sizeof(komunikat),
-						typ_komunikatu('B', 0, 0), 0);
+	while(ok){
+		x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat),0, 0);
 		if(x == -1)syserr("bank:Error in msgrcv\n");
 		
-		// czy ktoś kasuje rachunek?
-		if(komunikat.czy_zamykam_konto){
-			if(komunikat.kto_zleca == 0){
-				// muzeum zamyka konto: co się stanie z dorobkiem naszej cywilizacji .
-				czy_muzeum_dziala = 0;
-			} else {
-				// firma zamyka konto: stać ich na Bitcoin ? :O .
-				dzialajace_firmy--;
-				Firma_dziala[komunikat.kto_zleca] = 0;
-			}
-			if(!dzialajace_firmy && !czy_muzeum_dziala)
-				// nie posiadam już klijentow, zamykam interes :/ .
-				break; 
-			if(!dzialajace_firmy){
-				// Powiedz muzeum by kończył działalność.
-				struct kom_z_banku komunikat_odp;
-				komunikat_odp.koncz_dzialalnosc = 1;
-				komunikat_odp.adresat_komunikatu = typ_komunikatu('M', 0, 0);
-				int x = msgsnd(ID_KOLEJKI_BANKU, &komunikat_odp, sizeof(komunikat_odp),0);
-				if(x == -1)syserr("bank:Error in msgsnd\n");
-			}
-		} else if(komunikat.jakie_zlecenie == 'K'){
-			// Rozeslanie informacji o prośbe zakończenia dzialaności
-			// wszystkich dziłających firm.
-			struct kom_z_banku komunikat_odp;
-			komunikat_odp.koncz_dzialalnosc = 1;
-			for(int i = 1; i <= iloscFirm; i++)
-				if(Firma_dziala[i]){
-					komunikat_odp.adresat_komunikatu = typ_komunikatu('F', i, 0);
-					int x = msgsnd(ID_KOLEJKI_BANKU, &komunikat_odp, sizeof(komunikat_odp),0);
-					if(x == -1)syserr("bank:Error in msgsnd\n");
-				}
-			
-		} else {
-			// Odpowiadanie na zapytanie
-			struct kom_z_banku komunikat_odp;
-			if(komunikat.kto_zleca == 0)
-				komunikat_odp.adresat_komunikatu = typ_komunikatu('M', 0, 0);
-			else
-				komunikat_odp.adresat_komunikatu = typ_komunikatu('F', 
-					komunikat.kto_zleca, 0);
-			komunikat_odp.akceptacja_tranzakcji = 0;
-			komunikat_odp.koncz_dzialalnosc = 0;
-			if(komunikat.jakie_zlecenie == 'P'){
-				if(komunikat.id1 == 0 || Saldo[komunikat.id1] >= komunikat.kwota){
-					Saldo[komunikat.id1] -= komunikat.kwota;
+		switch(komunikat.jakie_zlecenie ){
+			case 'Z':
+				// Zamknięcie banku.
+				ok = 0;
+				break;
+			case 'P':
+				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
+				if(Saldo[komunikat.id1] < komunikat.kwota && komunikat.id1 != 0 )
+					komunikat_odp.akceptacja_tranzakcji = 0;
+				else {
+					komunikat_odp.akceptacja_tranzakcji = 1;
 					Saldo[komunikat.id2] += komunikat.kwota;
-					komunikat.akceptacja_tranzakcji = 1;
-			}
-			komunikat_odp.stan_konta = Saldo[komunikat.kto_zleca];
-			int x = msgsnd(ID_KOLEJKI_BANKU, &komunikat_odp, sizeof(komunikat_odp),0);
-			if(x == -1)syserr("bank:Error in msgsnd\n");
+					Saldo[komunikat.id1] -= komunikat.kwota;
+				}
+				
+				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
+				if(x == -1)syserr("bank:Error in msgsnd\n");
+				break;
+				
+			case 'I':
+				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
+				komunikat_odp.stan_konta = Saldo[komunikat.id1];	
+				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
+				if(x == -1)syserr("bank:Error in msgsnd\n");
+				break;
+			
 		}
 	}
 	free(Saldo);

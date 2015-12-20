@@ -19,7 +19,7 @@ void * delegat(void *id){
 	struct kom_do_delegata komunikat;
 	struct kom_do_banku komunikat_b_odp;
 	struct kom_z_banku komunikat_b;
-	komunikat_b_odp.kto_zleca = 0;
+	komunikat_b_odp.id_konta = id_firmy;
 	int pozwolenie = -1;
 	int maksymalna_glebokosc = -1;
 	int x, i, id_robotnika, ok;
@@ -33,6 +33,9 @@ void * delegat(void *id){
 		// ustalenie adresata:
 		komunikat_odp.id_adresata = komunikat.nadawca;
 		switch(komunikat.jakie_zlecenie ){
+			case 'K':
+				// Koniec działalności.
+				return (NULL);
 			case 'R':
 				// Przysyłają nam raport.
 				id_robotnika = id_robotnika_z_adresu(komunikat.nadawca, id_firmy);
@@ -133,8 +136,9 @@ void * delegat(void *id){
 
 
 int main(int argc, char **argv){
+	inituj_komunikacje('M');
 	if(argc != 5){
-		printf("BANK:Podales zla ilosc argumentow.\n");
+		printf("MUZEUM_:Podales zla ilosc argumentow.\n");
 		return 0;
 	}
 	
@@ -193,6 +197,13 @@ int main(int argc, char **argv){
 	// Oddelegowanie delegatów.
 	for(i = 1; i <= ilosc_firm; i++)
 		pthread_join(pth_delegaci[i - 1], NULL);
+	
+	// poinformowanie banku by skończył działalność.
+	struct kom_do_banku komunikat_do_banku;
+	komunikat_do_banku.id_konta = 0;
+	komunikat_do_banku.jakie_zlecenie = 'Z';
+	x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_banku, sizeof(komunikat_do_banku), 0);
+	if(x == -1)syserr("muzeum:Error in msgrcv\n");
 		
 		
 	free(Teren);

@@ -200,6 +200,7 @@ void * pracownik(void *id){
 
 
 int main(int argc, char **argv){
+	inituj_komunikacje('F');
 	if(argc != 4){
 		printf("firma:Podales zla ilosc argumentow.\n");
 		return 0;
@@ -232,9 +233,18 @@ int main(int argc, char **argv){
 		pthread_create( &pth_pracownik[i - 1], NULL, &pracownik, (void *) &indeksy[i - 1]);
 	}
 	
+	// Oddelegj pracownikóœ i kierownika.
 	pthread_join(pth_kierownik, NULL);
 	for(i = 1; i <= ilosc_pracownikow; i++)
 		pthread_join(pth_pracownik[i - 1], NULL);
+	
+	// Poinformuj że delegat w muzeum jest już niepotrzebny.
+	struct kom_do_delegata komunikat_do_delegata;
+	komunikat_do_delegata.id_firmy = id_firmy;
+	komunikat_do_delegata.jakie_zlecenie = 'K';
+	komunikat_do_delegata.nadawca = adres_firmy(id_firmy, 0);
+	x = msgsnd(ID_KOLEJKI_DELEGATOW, &komunikat_do_delegata, sizeof(komunikat_do_delegata),0);
+	if(x == -1)syserr("firma:Error in msgsnd\n");
 
 	return 0;
 }
