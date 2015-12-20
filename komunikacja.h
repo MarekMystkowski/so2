@@ -58,7 +58,7 @@ struct kom_do_delegata{
 	char jakie_zlecenie;
 	long nadawca;
 	int kolekcja, cena, ilosc_pol;
-	int ilosc_wykopanych_artefaktow, wykopane_artefakty[20], nr_terenu;
+	int ilosc_wykopanych_artefaktow, wykopane_artefakty[32], nr_terenu;
 };
 
 struct kom_do_firmy{
@@ -69,8 +69,12 @@ struct kom_do_firmy{
 	int symbol_zbioru, pozwolenie;
 };
 
-
-
+struct kom_1_z_banku_do_muzeum{
+	long nr_porcja;
+	int ilosc_firm;
+	int rozmiar_porcji;
+	int dane[10000];
+};
 
 
 

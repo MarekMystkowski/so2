@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <sys/types.h> 
 #include <sys/ipc.h> 
+#include "komunikacja.h"
 int *Saldo, iloscFirm, oplataStala, ograniczenieA;
 int dzialajace_firmy, czy_muzeum_dziala;
 int *Firma_dziala;

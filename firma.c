@@ -1,6 +1,3 @@
-/// DO POPRAWY:
-/// 1) NIspójność w kolejkach delegatów !
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -240,4 +237,21 @@ int main(int argc, char **argv){
 		pthread_join(pth_pracownik[i - 1], NULL);
 
 	return 0;
+}
+
+int czy_pierwsza(int x){
+	int i;
+	for(i = 2; i*i <= x; i++)
+		if(x % i) return 0;
+	return 1;
+}
+void PRACUJ(int symbol_zbioru, struct kom_do_delegata *odp){
+	odp->ilosc_wykopanych_artefaktow = 0;
+	int p;
+	for(p = 2; p <= ograniczenieA; p++)
+		if(czy_pierwsza(p))
+			while(symbol_zbioru % p == 0){
+				odp->wykopane_artefakty[odp->ilosc_wykopanych_artefaktow++] = p;
+				symbol_zbioru /= p;
+			}
 }
