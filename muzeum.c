@@ -10,13 +10,14 @@
 #define Teren(x, y) Teren[((x) - 1) * glembokosc + (y) - 1]
 int dlugosc, glembokosc, oplataStala, ograniczenieA;
 int *Szacunek, *Teren;
+int *ilosc_robotnikow, *glembokosc_kopania, *kolekcja_muzeum, *zajety_teren;
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
-void delegat(void *id){
-	int id_firmy = (int) id;
+void * delegat(void *id){
+	int id_firmy = * (int *)id;
 	struct kom_do_firmy komunikat_odp;
-	struct kom_do_muzeum komunikat;
+	struct kom_do_delegata komunikat;
 	struct kom_do_banku komunikat_b_odp;
 	struct kom_z_banku komunikat_b;
 	komunikat_b_odp.kto_zleca = 0;
@@ -31,8 +32,8 @@ void delegat(void *id){
 		if(x == -1)syserr("muzeum:Error in msgrcv\n");
 		
 		// ustalenie adresata:
-		komunikat_odp.id_adresata = komunikat.id_nadawcy;
-		swich(komunikat.jakie_zlecenie){
+		komunikat_odp.id_adresata = komunikat.nadawca;
+		switch(komunikat.jakie_zlecenie ){
 			case 'R':
 				// Przysyłają nam raport.
 				id_robotnika = id_robotnika_z_adresu(komunikat.nadawca, id_firmy);
@@ -63,7 +64,7 @@ void delegat(void *id){
 					komunikat_odp.jakie_zlecenie = 'T';
 					komunikat_odp.symbol_zbioru = Teren(komunikat.nr_terenu, 
 						glembokosc_kopania[komunikat.nr_terenu]);
-				else komunikat_odp.jakie_zlecenie = 'N';
+					} else komunikat_odp.jakie_zlecenie = 'N';
 				break;
 			case 'S':
 				// Sprzedają nam artefakty.
@@ -95,7 +96,7 @@ void delegat(void *id){
 				
 				// Twra zwalnianie terenów.
 				for(i = 0; i < ilosc_robotnikow[id_firmy]; i++)
-					Zajety_teren[i] = 0;
+					zajety_teren[i] = 0;
 	
 				pthread_mutex_unlock( &mutex );
 				
@@ -122,6 +123,7 @@ void delegat(void *id){
 		x = msgsnd(ID_KOLEJKI_FIRM, &komunikat_odp, sizeof(komunikat_odp),0);
 		if(x == -1)syserr("muzeum:Error in msgsnd\n");
 	}
+	return (NULL);
 }
 
 
@@ -143,19 +145,19 @@ int main(int argc, char **argv){
 	}
 	
 	dlugosc = atoi(argv[1]);
-	glebokosc = atoi(argv[2]);
+	glembokosc = atoi(argv[2]);
 	oplataStala = atoi(argv[3]);
 	ograniczenieA = atoi(argv[4]);
 	Szacunek = malloc(sizeof(int) * dlugosc * glembokosc);
 	Teren = malloc(sizeof(int) * dlugosc * glembokosc);
-	
+	int dlu, gle;
 	// wczytanie danych:
-	for(int dlu = 1; dlu <= dlugosc; dlu++)
-		for(int gle = 1; gle <= glembokosc; gle++)
+	for(dlu = 1; dlu <= dlugosc; dlu++)
+		for(gle = 1; gle <= glembokosc; gle++)
 			scanf("%d", &Teren(dlu, gle));
 			
-	for(int dlu = 1; dlu <= dlugosc; dlu++)
-		for(int gle = 1; gle <= glembokosc; gle++)
+	for(dlu = 1; dlu <= dlugosc; dlu++)
+		for(gle = 1; gle <= glembokosc; gle++)
 			scanf("%d", &Szacunek(dlu, gle));
 	
 	
