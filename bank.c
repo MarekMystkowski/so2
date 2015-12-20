@@ -49,7 +49,7 @@ int main(int argc, char **argv){
 		komunikat_do_firm1.liczba_pracownikow = liczba_pracownikow;
 		x = msgsnd(ID_KOLEJKI_BANK_FIRMA, &komunikat_do_firm1, 
 			sizeof(komunikat_do_firm1),0);
-		if(x == -1)syserr("bank:Error in msgsnd\n");
+		if(x == -1)syserr("bank:Error in msgsnd1\n");
 	}
 	
 	
@@ -59,7 +59,7 @@ int main(int argc, char **argv){
 	struct kom_1_z_banku_do_muzeum komunikat_do_muzeum1;
 	komunikat_do_muzeum1.ilosc_firm = iloscFirm;
 	komunikat_do_muzeum1.nr_porcja = 1;
-	komunikat_do_muzeum1.rozmiar_porcji = 10000;
+	komunikat_do_muzeum1.rozmiar_porcji = 100;
 	
 	i = 0;
 	while(i * komunikat_do_muzeum1.rozmiar_porcji < iloscFirm){
@@ -70,11 +70,11 @@ int main(int argc, char **argv){
 
 		x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_muzeum1,
 				sizeof(komunikat_do_muzeum1), 0);
-		if(x == -1)syserr("bank:Error in msgsnd\n");
+		if(x == -1)syserr("bank:Error in msgsnd2\n");
 		i++;
 	}
 	
-	
+	printf("Bank przechodzi w obsługe kont\n");
 	
 	ok = 1;
 	struct kom_z_banku komunikat_odp;
@@ -82,14 +82,16 @@ int main(int argc, char **argv){
 	// obsluga kont:
 	while(ok){
 		x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat),0, 0);
-		if(x == -1)syserr("bank:Error in msgrcv\n");
+		if(x == -1)syserr("bank:Error in msgrcv3\n");
 		
 		switch(komunikat.jakie_zlecenie ){
 			case 'Z':
 				// Zamknięcie banku.
 				ok = 0;
+				printf("bank:    zadanie zakonczenia\n");
 				break;
 			case 'P':
+				printf("bank:    zadanie przeledu %d -> %d [%d]\n",komunikat.id1, komunikat.id2, komunikat.kwota );
 				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
 				if(Saldo[komunikat.id1] < komunikat.kwota && komunikat.id1 != 0 )
 					komunikat_odp.akceptacja_tranzakcji = 0;
@@ -100,14 +102,14 @@ int main(int argc, char **argv){
 				}
 				
 				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
-				if(x == -1)syserr("bank:Error in msgsnd\n");
+				if(x == -1)syserr("bank:Error in msgsnd4\n");
 				break;
 				
 			case 'I':
 				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
 				komunikat_odp.stan_konta = Saldo[komunikat.id1];	
 				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
-				if(x == -1)syserr("bank:Error in msgsnd\n");
+				if(x == -1)syserr("bank:Error in msgsnd5\n");
 				break;
 			
 		}

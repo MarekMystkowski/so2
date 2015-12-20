@@ -32,6 +32,7 @@ void * delegat(void *id){
 		
 		// ustalenie adresata:
 		komunikat_odp.id_adresata = komunikat.nadawca;
+		printf("Muzeum:    klijent:%ld zlecenie:%c\n",  komunikat.nadawca,  komunikat.jakie_zlecenie);
 		switch(komunikat.jakie_zlecenie ){
 			case 'K':
 				// Koniec działalności.
@@ -112,16 +113,38 @@ void * delegat(void *id){
 				// Przyjmowanie nowej oferty.
 				komunikat_odp.jakie_zlecenie = 'N';
 				if(pozwolenie != -1) break; // Ma już pozwolenie.
-				
+
 				// Procesz szukania terenu do pracy:
 				SZUKAJ(ilosc_robotnikow[id_firmy], komunikat.cena - oplataStala,
 					&pozwolenie, &maksymalna_glebokosc);
-				// Jeśli znaleziono pozwolenie to zarezerwuj teren.
+					
+				// Jeśli znaleziono pozwolenie to zleć przelew.
 				if(pozwolenie != -1){
+					
+					// Wysyłanie zlecenia przelewu do banku.
+					komunikat_b_odp.id_konta = id_firmy;
+					komunikat_b_odp.jakie_zlecenie = 'P';
+					komunikat_b_odp.kwota = komunikat.cena;
+					komunikat_b_odp.id1 = id_firmy;
+					komunikat_b_odp.id2 = 0;
+					
+					x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
+					if(x == -1)syserr("muzeum:Error in msgsnd\n");
+				
+					// Czekanie na odpowiedź banku.
+					x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
+					if(x == -1)syserr("muzeum:Error in msgrcv\n");
+					if(!komunikat_b.akceptacja_tranzakcji)pozwolenie = -1;
+				}
+					
+					
+				// Jeśli przelew udany, zarezerwuj teren.
+				if(pozwolenie != -1){	
 					for(i = 0; i < ilosc_robotnikow[id_firmy]; i++)
 						zajety_teren[i + pozwolenie] = 1;
+					komunikat_odp.jakie_zlecenie = 'P';
 				}
-				komunikat_odp.jakie_zlecenie = 'P';
+				
 				komunikat_odp.pozwolenie = pozwolenie;
 				break;
 			
@@ -185,6 +208,7 @@ int main(int argc, char **argv){
 	for(i = 0; i <= dlugosc; i++)
 		glembokosc_kopania[i] = zajety_teren[i] = 0;
 	
+	printf("Muzeum zaczyna tworzenie delegatow\n");
 	
 	// Stworzenie delegatów.
 	pthread_t pth_delegaci[ilosc_firm];
@@ -193,10 +217,13 @@ int main(int argc, char **argv){
 		indeksy[i - 1] = i;
 		pthread_create( &pth_delegaci[i - 1], NULL, &delegat, (void *) &indeksy[i - 1]);
 	}
+	printf("Muzeum stworzylo delegatow\n");
 	
 	// Oddelegowanie delegatów.
 	for(i = 1; i <= ilosc_firm; i++)
 		pthread_join(pth_delegaci[i - 1], NULL);
+	
+	printf("Muzeum oddelegowalo delegatow\n");
 	
 	// poinformowanie banku by skończył działalność.
 	struct kom_do_banku komunikat_do_banku;

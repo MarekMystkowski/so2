@@ -24,10 +24,10 @@ int ID_KOLEJKI_BANK_MUZEUM; // kolejka między bankiem a muzeum;
 int ID_KOLEJKI_FIRM; // Kolejka do pisania dla robotników i kierowników.
 int ID_KOLEJKI_BANK_FIRMA;
 void inituj_komunikacje(char dla_kogo){
-	ID_KOLEJKI_DELEGATOW = msgget(1, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_BANK_MUZEUM = msgget(2, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_FIRM = msgget(3, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_BANK_FIRMA = msgget(4, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_DELEGATOW = msgget(101, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_BANK_MUZEUM = msgget(102, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_FIRM = msgget(103, IPC_CREAT|S_IRWXU);
+	ID_KOLEJKI_BANK_FIRMA = msgget(104, IPC_CREAT|S_IRWXU);
 }
 long adres_firmy(int id_firmy, int id_robotnika){
 	return (long) id_firmy * (long)1000000 + (long)id_robotnika;
@@ -78,19 +78,8 @@ struct kom_1_z_banku_do_muzeum{
 	long nr_porcja;
 	int ilosc_firm;
 	int rozmiar_porcji;
-	int dane[10000];
+	int dane[100];
 };
-
-
-
-
-
-
-
-
-
-
-
 
 void syserr(const char *fmt, ...)  
 {
