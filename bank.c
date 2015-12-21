@@ -112,6 +112,7 @@ int main(int argc, char **argv){
 			
 		}
 	}
+	//for(id = 1; id <= iloscFirm; id++) wait(NULL);
 	free(LiczbaPracownikow);
 	free(Saldo);
 	return 0;

@@ -212,9 +212,10 @@ void * pracownik(void *id){
 				printf("firma %d pr:%d :     V(mutex)__12\n", id_firmy, moje_id ); 
 				pthread_mutex_unlock( &mutex );
 				
+				
 				// Pracuję nad wykopaliskiem wynik zapisuje na komunikacie odp.
 				PRACUJ(komunikat.symbol_zbioru, &komunikat_odp);
-				
+				printf("firma %d pr%d :     po_pracy\n", id_firmy, moje_id);
 				// Skończyłem pracę wysyłam raport
 				komunikat_odp.jakie_zlecenie = 'R';
 				x = msgsnd(ID_KOLEJKI_DELEGATOW, &komunikat_odp, sizeof(komunikat_odp),0);

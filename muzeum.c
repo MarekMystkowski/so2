@@ -28,7 +28,7 @@ void * delegat(void *id){
 	// Jeden obrut pętli to obsługa jednego komunikatu.
 	while(1){
 		x = msgrcv(ID_KOLEJKI_DELEGATOW, &komunikat, sizeof(komunikat), id_firmy, 0);
-		if(x == -1)syserr("muzeum:Error in msgrcv\n");
+		if(x == -1)syserr("muzeum:Error in msgrcv1\n");
 		
 		// ustalenie adresata:
 		komunikat_odp.id_adresata = komunikat.nadawca;
@@ -79,11 +79,11 @@ void * delegat(void *id){
 				komunikat_b_odp.kwota = komunikat.kolekcja * 10;
 				komunikat_b_odp.jakie_zlecenie = 'P';
 				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
-				if(x == -1)syserr("muzeum:Error in msgsnd\n");
+				if(x == -1)syserr("muzeum:Error in msgsnd2\n");
 				
 				// Czekanie na akceptacje.
 				x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
-				if(x == -1)syserr("muzeum:Error in msgrcv\n");
+				if(x == -1)syserr("muzeum:Error in msgrcv3\n");
 				assert(komunikat_b.akceptacja_tranzakcji);
 				
 				// Dodanie do kolekcji muzeum i przygotowanie odpowiedzi.
@@ -129,11 +129,11 @@ void * delegat(void *id){
 					komunikat_b_odp.id2 = 0;
 					
 					x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
-					if(x == -1)syserr("muzeum:Error in msgsnd\n");
+					if(x == -1)syserr("muzeum:Error in msgsnd4\n");
 				
 					// Czekanie na odpowiedź banku.
 					x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
-					if(x == -1)syserr("muzeum:Error in msgrcv\n");
+					if(x == -1)syserr("muzeum:Error in msgrcv5\n");
 					if(!komunikat_b.akceptacja_tranzakcji)pozwolenie = -1;
 				}
 					
@@ -152,7 +152,7 @@ void * delegat(void *id){
 		
 		// wysyłanie:
 		x = msgsnd(ID_KOLEJKI_FIRM, &komunikat_odp, sizeof(komunikat_odp),0);
-		if(x == -1)syserr("muzeum:Error in msgsnd\n");
+		if(x == -1)syserr("muzeum:Error in msgsnd6\n");
 	}
 	return (NULL);
 }
@@ -186,7 +186,7 @@ int main(int argc, char **argv){
 	// Pobranie informacji o ilości firm i ilości robotników w każdej firmie.
 	struct kom_1_z_banku_do_muzeum komunikat;
 	x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat), 1, 0);
-	if(x == -1)syserr("muzeum:Error in msgrcv\n");
+	if(x == -1)syserr("muzeum:Error in msgrcv7\n");
 	ilosc_firm = komunikat.ilosc_firm; 
 	ilosc_robotnikow = malloc(sizeof(int) * (ilosc_firm + 1));
 	
@@ -194,7 +194,7 @@ int main(int argc, char **argv){
 	while(i * komunikat.rozmiar_porcji < ilosc_firm){
 		if( i != 0){
 			x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat), i + 1, 0);
-			if(x == -1)syserr("muzeum:Error in msgrcv\n");
+			if(x == -1)syserr("muzeum:Error in msgrcv8\n");
 		}
 		
 		for(j = 0; j < komunikat.rozmiar_porcji; j++)
@@ -230,7 +230,7 @@ int main(int argc, char **argv){
 	komunikat_do_banku.id_konta = 1;
 	komunikat_do_banku.jakie_zlecenie = 'Z';
 	x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_banku, sizeof(komunikat_do_banku), 0);
-	if(x == -1)syserr("muzeum:Error in msgrcv\n");
+	if(x == -1)syserr("muzeum:Error in msgrcv9\n");
 		
 		
 	free(Teren);
