@@ -19,16 +19,41 @@
 #include <sys/wait.h>
 #include <string.h>
 
-int ID_KOLEJKI_DELEGATOW; // kolejka do pisania do delegatów.
-int ID_KOLEJKI_BANK_MUZEUM; // kolejka między bankiem a muzeum;
-int ID_KOLEJKI_FIRM; // Kolejka do pisania dla robotników i kierowników.
-int ID_KOLEJKI_BANK_FIRMA;
+int ID_KOL_WSTEPNY_DO_FIRM_Z_BANKU,
+ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU,
+ID_KOL_DO_FIRMY_Z_MUZEUM,
+ID_KOL_DO_MUZEUM_Z_FIRMY,
+ID_KOL_DO_BANKU_Z_MUZEUM,
+ID_KOL_DO_MUZEUM_Z_BANKU,
+ID_KOL_DO_RAPORTOW;
+void syserr(const char *fmt, ...);
 void inituj_komunikacje(char dla_kogo){
-	ID_KOLEJKI_DELEGATOW = msgget(101, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_BANK_MUZEUM = msgget(102, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_FIRM = msgget(103, IPC_CREAT|S_IRWXU);
-	ID_KOLEJKI_BANK_FIRMA = msgget(104, IPC_CREAT|S_IRWXU);
+	ID_KOL_WSTEPNY_DO_FIRM_Z_BANKU =msgget(1, IPC_CREAT|S_IRWXU);
+	ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU =msgget(2, IPC_CREAT|S_IRWXU);
+	ID_KOL_DO_FIRMY_Z_MUZEUM =msgget(3, IPC_CREAT|S_IRWXU);
+	ID_KOL_DO_MUZEUM_Z_FIRMY =msgget(4, IPC_CREAT|S_IRWXU);
+	ID_KOL_DO_BANKU_Z_MUZEUM =msgget(5, IPC_CREAT|S_IRWXU);
+	ID_KOL_DO_MUZEUM_Z_BANKU =msgget(6, IPC_CREAT|S_IRWXU);
+	ID_KOL_DO_RAPORTOW =msgget(7, IPC_CREAT|S_IRWXU);
 }
+
+void usun_komunikacje(){
+	 if(msgctl(ID_KOL_WSTEPNY_DO_FIRM_Z_BANKU, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_DO_FIRMY_Z_MUZEUM, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_DO_MUZEUM_Z_FIRMY, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_DO_BANKU_Z_MUZEUM, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_DO_MUZEUM_Z_BANKU, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+	if(msgctl(ID_KOL_DO_RAPORTOW, IPC_RMID, 0) == -1)
+		syserr("msgctl");
+}
+
 long adres_firmy(int id_firmy, int id_robotnika){
 	return (long) id_firmy * (long)1000000 + (long)id_robotnika;
 }
@@ -44,7 +69,8 @@ struct kom_1_z_baku_do_firmy{
 };
 
 struct kom_do_banku{
-	long id_konta; // typ.
+	long typ_banku;
+	long odbiorca;
 	// I - informaca o saldzie, P - wykonanie przelewu, Z - bank ma zakończyć działanie.
 	char jakie_zlecenie; 
 	int kwota, id1, id2; // przelewy wykonywane są z id1-->id2 
@@ -78,6 +104,12 @@ struct kom_1_z_banku_do_muzeum{
 	long nr_porcja;
 	int ilosc_firm;
 	int rozmiar_porcji;
+	int dane[100];
+};
+
+struct kom_raport{
+	long nr_firmy;
+	int ile, koniec;
 	int dane[100];
 };
 

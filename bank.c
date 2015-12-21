@@ -1,6 +1,3 @@
-/* Bank musi obsługiwać tylko zlecenia od Muzeum.
- * I tylko przelewy.
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -35,6 +32,7 @@ int main(int argc, char **argv){
 	Saldo = malloc((iloscFirm + 1) * sizeof(int));
 	LiczbaPracownikow = malloc((iloscFirm + 1) * sizeof(int));
 	Saldo[0] = 0; // Ustalenie salda dla muzeum.
+	
 	// Wczytanie danych i wysłanie komunikatów wstępnych dla firm:
 	int id_firmy, poczatkowe_saldo, liczba_pracownikow, j, ok;
 	struct kom_1_z_baku_do_firmy komunikat_do_firm1;
@@ -42,14 +40,12 @@ int main(int argc, char **argv){
 		scanf("%d %d %d", &id_firmy, &poczatkowe_saldo, &liczba_pracownikow);
 		Saldo[id_firmy] = poczatkowe_saldo;
 		LiczbaPracownikow[id_firmy] = liczba_pracownikow;
-		
-		// ustawienie adresata na firmę.
-		komunikat_do_firm1.adresat_komunikatu =adres_firmy(id_firmy, 0);
+		komunikat_do_firm1.adresat_komunikatu = id_firmy;
 		komunikat_do_firm1.saldo = poczatkowe_saldo;
 		komunikat_do_firm1.liczba_pracownikow = liczba_pracownikow;
-		x = msgsnd(ID_KOLEJKI_BANK_FIRMA, &komunikat_do_firm1, 
+		x = msgsnd(ID_KOL_WSTEPNY_DO_FIRM_Z_BANKU, &komunikat_do_firm1, 
 			sizeof(komunikat_do_firm1),0);
-		if(x == -1)syserr("bank:Error in msgsnd1\n");
+		if(x == -1)syserr("bank: Error in msgsnd[1]\n");
 	}
 	
 	
@@ -66,31 +62,28 @@ int main(int argc, char **argv){
 			komunikat_do_muzeum1.dane[j] = 
 				LiczbaPracownikow[komunikat_do_muzeum1.rozmiar_porcji * i + j + 1] ;
 
-		x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_muzeum1,
+		x = msgsnd(ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU, &komunikat_do_muzeum1,
 				sizeof(komunikat_do_muzeum1), 0);
-		if(x == -1)syserr("bank:Error in msgsnd2\n");
+		if(x == -1)syserr("bank: Error in msgsnd[2]\n");
 		i++;
 	}
-	
-	printf("Bank przechodzi w obsługe kont\n");
 	
 	ok = 1;
 	struct kom_z_banku komunikat_odp;
 	struct kom_do_banku komunikat;
+	
 	// obsluga kont:
 	while(ok){
-		x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat),0, 0);
-		if(x == -1)syserr("bank:Error in msgrcv3\n");
+		x = msgrcv(ID_KOL_DO_BANKU_Z_MUZEUM, &komunikat, sizeof(komunikat), 0, 0);
+		if(x == -1)syserr("bank: Error in msgrcv[3]\n");
 		
 		switch(komunikat.jakie_zlecenie ){
 			case 'Z':
 				// Zamknięcie banku.
 				ok = 0;
-				printf("bank:    zadanie zakonczenia\n");
 				break;
 			case 'P':
-				printf("bank:    zadanie przeledu %d -> %d [%d]\n",komunikat.id1, komunikat.id2, komunikat.kwota );
-				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
+				komunikat_odp.adresat_komunikatu = komunikat.odbiorca;
 				if(Saldo[komunikat.id1] < komunikat.kwota && komunikat.id1 != 0 )
 					komunikat_odp.akceptacja_tranzakcji = 0;
 				else {
@@ -99,21 +92,22 @@ int main(int argc, char **argv){
 					Saldo[komunikat.id1] -= komunikat.kwota;
 				}
 				
-				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
-				if(x == -1)syserr("bank:Error in msgsnd4\n");
+				x = msgsnd(ID_KOL_DO_MUZEUM_Z_BANKU, &komunikat_odp, sizeof(komunikat_odp), 0);
+				if(x == -1)syserr("bank: Error in msgsnd[4]\n");
 				break;
 				
 			case 'I':
-				komunikat_odp.adresat_komunikatu = komunikat.id_konta;
+				komunikat_odp.adresat_komunikatu = komunikat.odbiorca;
 				komunikat_odp.stan_konta = Saldo[komunikat.id1];	
-				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_odp, sizeof(komunikat_odp), 0);
-				if(x == -1)syserr("bank:Error in msgsnd5\n");
+				x = msgsnd(ID_KOL_DO_MUZEUM_Z_BANKU, &komunikat_odp, sizeof(komunikat_odp), 0);
+				if(x == -1)syserr("bank: Error in msgsnd[5]\n");
 				break;
 			
 		}
 	}
-	//for(id = 1; id <= iloscFirm; id++) wait(NULL);
+	for(id = 1; id <= iloscFirm; id++) wait(NULL);
 	free(LiczbaPracownikow);
 	free(Saldo);
+	usun_komunikacje();
 	return 0;
 }

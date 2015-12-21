@@ -8,7 +8,7 @@
 #define Szacunek(x, y) Szacunek[((x) - 1) * glembokosc + (y) - 1]
 #define Teren(x, y) Teren[((x) - 1) * glembokosc + (y) - 1]
 int dlugosc, glembokosc, oplataStala, ograniczenieA, ilosc_firm;
-int *Szacunek, *Teren;
+int *Szacunek, *Teren, **dane_raportu, *dlugosc_raportu;
 int *ilosc_robotnikow, *glembokosc_kopania, kolekcja_muzeum[1000009], *zajety_teren;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -19,24 +19,26 @@ void * delegat(void *id){
 	struct kom_do_delegata komunikat;
 	struct kom_do_banku komunikat_b_odp;
 	struct kom_z_banku komunikat_b;
-	komunikat_b_odp.id_konta = id_firmy;
+	komunikat_b_odp.odbiorca = id_firmy;
+	komunikat_b_odp.typ_banku = 1;
 	int pozwolenie = -1;
 	int maksymalna_glebokosc = -1;
-	int x, i, id_robotnika, ok;
+	int x, i, id_robotnika, ok, pracuj;
+	pracuj = 1;
 	int stan_robotnika[ilosc_robotnikow[id_firmy] + 1];
 	for (i = 0; i < ilosc_robotnikow[id_firmy] + 1; i++) stan_robotnika[i] = -1;
 	// Jeden obrut pętli to obsługa jednego komunikatu.
-	while(1){
-		x = msgrcv(ID_KOLEJKI_DELEGATOW, &komunikat, sizeof(komunikat), id_firmy, 0);
-		if(x == -1)syserr("muzeum:Error in msgrcv1\n");
+	while(pracuj){
+		x = msgrcv(ID_KOL_DO_MUZEUM_Z_FIRMY, &komunikat, sizeof(komunikat), id_firmy, 0);
+		if(x == -1)syserr("muzeum: Error in msgrcv[1]\n");
 		
 		// ustalenie adresata:
 		komunikat_odp.id_adresata = komunikat.nadawca;
-		printf("Muzeum:    klijent:%ld zlecenie:%c\n",  komunikat.nadawca,  komunikat.jakie_zlecenie);
 		switch(komunikat.jakie_zlecenie ){
 			case 'K':
 				// Koniec działalności.
-				return (NULL);
+				pracuj = 0;
+				break;
 			case 'R':
 				// Przysyłają nam raport.
 				id_robotnika = id_robotnika_z_adresu(komunikat.nadawca, id_firmy);
@@ -78,12 +80,13 @@ void * delegat(void *id){
 				komunikat_b_odp.id2 = id_firmy;
 				komunikat_b_odp.kwota = komunikat.kolekcja * 10;
 				komunikat_b_odp.jakie_zlecenie = 'P';
-				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
-				if(x == -1)syserr("muzeum:Error in msgsnd2\n");
+				komunikat_b_odp.odbiorca = id_firmy;
+				x = msgsnd(ID_KOL_DO_BANKU_Z_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
+				if(x == -1)syserr("muzeum: Error in msgsnd[2]\n");
 				
 				// Czekanie na akceptacje.
-				x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
-				if(x == -1)syserr("muzeum:Error in msgrcv3\n");
+				x = msgrcv(ID_KOL_DO_MUZEUM_Z_BANKU, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
+				if(x == -1)syserr("muzeum: Error in msgrcv[3]\n");
 				assert(komunikat_b.akceptacja_tranzakcji);
 				
 				// Dodanie do kolekcji muzeum i przygotowanie odpowiedzi.
@@ -122,18 +125,18 @@ void * delegat(void *id){
 				if(pozwolenie != -1){
 					
 					// Wysyłanie zlecenia przelewu do banku.
-					komunikat_b_odp.id_konta = id_firmy;
+					komunikat_b_odp.odbiorca = id_firmy;
 					komunikat_b_odp.jakie_zlecenie = 'P';
 					komunikat_b_odp.kwota = komunikat.cena;
 					komunikat_b_odp.id1 = id_firmy;
 					komunikat_b_odp.id2 = 0;
 					
-					x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
-					if(x == -1)syserr("muzeum:Error in msgsnd4\n");
+					x = msgsnd(ID_KOL_DO_BANKU_Z_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
+					if(x == -1)syserr("muzeum: Error in msgsnd[4]\n");
 				
 					// Czekanie na odpowiedź banku.
-					x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
-					if(x == -1)syserr("muzeum:Error in msgrcv5\n");
+					x = msgrcv(ID_KOL_DO_MUZEUM_Z_BANKU, &komunikat_b, sizeof(komunikat_b), id_firmy, 0);
+					if(x == -1)syserr("muzeum: Error in msgrcv[5]\n");
 					if(!komunikat_b.akceptacja_tranzakcji)pozwolenie = -1;
 				}
 					
@@ -149,11 +152,34 @@ void * delegat(void *id){
 				break;
 			
 		}
-		
-		// wysyłanie:
-		x = msgsnd(ID_KOLEJKI_FIRM, &komunikat_odp, sizeof(komunikat_odp),0);
-		if(x == -1)syserr("muzeum:Error in msgsnd6\n");
+		if(pracuj){
+			// wysyłanie:
+			x = msgsnd(ID_KOL_DO_FIRMY_Z_MUZEUM, &komunikat_odp, sizeof(komunikat_odp),0);
+			if(x == -1)syserr("muzeum: Error in msgsnd[6]\n");
+		}
 	}
+	// Odebranie raportu.
+	struct kom_raport rap;
+	dlugosc_raportu[id_firmy] = 0;
+	dane_raportu[id_firmy] = malloc(sizeof(int) * 100);
+	
+	x = msgrcv(ID_KOL_DO_RAPORTOW, &rap, sizeof(rap), id_firmy, 0);
+	if(x == -1)syserr("muzeum: Error in msgrcv[10]\n");
+	
+	for( i = 0 ; i < 100 ; i++)dane_raportu[id_firmy][i] = rap.dane[i];
+	dlugosc_raportu[id_firmy] = rap.ile;
+	int j;
+	while(!rap.koniec){
+		dane_raportu[id_firmy] = realloc(dane_raportu[id_firmy], sizeof(int) * 
+			(dlugosc_raportu[id_firmy] +100));
+		// pobranie nowego raportu.
+		x = msgrcv(ID_KOL_DO_RAPORTOW, &rap, sizeof(rap), id_firmy, 0);
+		if(x == -1)syserr("muzeum: Error in msgrcv[10]\n");
+		for( j = 0 ; j < 100 ; j++)dane_raportu[id_firmy][i + j] = rap.dane[i];
+		i = j + i;
+		dlugosc_raportu[id_firmy] += rap.ile;
+	}
+	
 	return (NULL);
 }
 
@@ -161,7 +187,7 @@ void * delegat(void *id){
 int main(int argc, char **argv){
 	inituj_komunikacje('M');
 	if(argc != 5){
-		printf("MUZEUM_:Podales zla ilosc argumentow.\n");
+		printf("MUZEUM: Podales zla ilosc argumentow.\n");
 		return 0;
 	}
 	
@@ -185,16 +211,16 @@ int main(int argc, char **argv){
 	
 	// Pobranie informacji o ilości firm i ilości robotników w każdej firmie.
 	struct kom_1_z_banku_do_muzeum komunikat;
-	x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat), 1, 0);
-	if(x == -1)syserr("muzeum:Error in msgrcv7\n");
+	x = msgrcv(ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU, &komunikat, sizeof(komunikat), 1, 0);
+	if(x == -1)syserr("muzeum: Error in msgrcv[7]\n");
 	ilosc_firm = komunikat.ilosc_firm; 
 	ilosc_robotnikow = malloc(sizeof(int) * (ilosc_firm + 1));
 	
 	i = 0;
 	while(i * komunikat.rozmiar_porcji < ilosc_firm){
 		if( i != 0){
-			x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat), i + 1, 0);
-			if(x == -1)syserr("muzeum:Error in msgrcv8\n");
+			x = msgrcv(ID_KOL_WSTEPNY_DO_MUZEUM_Z_BANKU, &komunikat, sizeof(komunikat), i + 1, 0);
+			if(x == -1)syserr("muzeum: Error in msgrcv[8]\n");
 		}
 		
 		for(j = 0; j < komunikat.rozmiar_porcji; j++)
@@ -204,11 +230,12 @@ int main(int argc, char **argv){
 	
 	// Stworzenie tablic.
 	glembokosc_kopania = malloc(sizeof(int) * (dlugosc + 1));
+	dlugosc_raportu = malloc(sizeof(int) * (ilosc_firm + 1));
+	dane_raportu = (int**) malloc(sizeof(int*) * (ilosc_firm + 1));
+	for(i = 1; i <= ilosc_firm; i++) dane_raportu[i] = NULL;
 	zajety_teren = malloc(sizeof(int) * (dlugosc + 1));
 	for(i = 0; i <= dlugosc; i++)
 		glembokosc_kopania[i] = zajety_teren[i] = 0;
-	
-	printf("Muzeum zaczyna tworzenie delegatow\n");
 	
 	// Stworzenie delegatów.
 	pthread_t pth_delegaci[ilosc_firm];
@@ -217,22 +244,38 @@ int main(int argc, char **argv){
 		indeksy[i - 1] = i;
 		pthread_create( &pth_delegaci[i - 1], NULL, &delegat, (void *) &indeksy[i - 1]);
 	}
-	printf("Muzeum stworzylo delegatow\n");
 	
 	// Oddelegowanie delegatów.
 	for(i = 1; i <= ilosc_firm; i++)
 		pthread_join(pth_delegaci[i - 1], NULL);
 	
-	printf("Muzeum oddelegowalo delegatow\n");
 	
 	// poinformowanie banku by skończył działalność.
 	struct kom_do_banku komunikat_do_banku;
-	komunikat_do_banku.id_konta = 1;
+	komunikat_do_banku.typ_banku = 1;
 	komunikat_do_banku.jakie_zlecenie = 'Z';
-	x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_banku, sizeof(komunikat_do_banku), 0);
-	if(x == -1)syserr("muzeum:Error in msgrcv9\n");
-		
-		
+	x = msgsnd(ID_KOL_DO_BANKU_Z_MUZEUM, &komunikat_do_banku, sizeof(komunikat_do_banku), 0);
+	if(x == -1)syserr("muzeum: Error in msgrcv[9]\n");
+	
+	for(dlu = 1; dlu <= dlugosc; dlu++){
+		for(gle = 1; gle <= glembokosc; gle++){
+			if(glembokosc_kopania[dlu] < gle )
+				printf("2 ");
+			 else printf("0 ");
+		}
+		printf("\n");
+	}
+	
+	// Wypisanie raportu firm:
+	for(i = 1; i <= ilosc_firm; i++){
+		printf("\n");
+		for(j = 0; j < dlugosc_raportu[i] ; j+= 2)
+			printf("%d %d\n", dane_raportu[i][j], dane_raportu[i][j + 1]);
+		free(dane_raportu[i]);
+	}
+	
+	free(dlugosc_raportu);
+	free(dane_raportu);
 	free(Teren);
 	free(Szacunek);	
 	free(ilosc_robotnikow);
@@ -240,8 +283,6 @@ int main(int argc, char **argv){
 	free(zajety_teren);
 	return 0;
 }
-
-//glembokosc_kopania[], zajety_teren[];
 
 void SZUKAJ(int d, int max_szac, int *pozwolenie, int *max_gle){
 	int i, zajetych, szac, pop_szac, gle, j;
@@ -252,7 +293,7 @@ void SZUKAJ(int d, int max_szac, int *pozwolenie, int *max_gle){
 	}
 	for(i = 1; i <= d; i++)
 		zajetych += zajety_teren[i];
-	
+	i--;
 	while(i <= dlugosc){
 		if(zajetych == 0){
 			// Nikt nie kopie na tym odcinku.
@@ -276,7 +317,7 @@ void SZUKAJ(int d, int max_szac, int *pozwolenie, int *max_gle){
 			if(szac > 0 && szac <= max_szac){
 				// Udane poszukiwanie.
 				*pozwolenie = i - d +1;
-				*max_gle = gle ;
+				*max_gle = gle - 1 ;
 				return;
 			}
 		}
@@ -284,6 +325,5 @@ void SZUKAJ(int d, int max_szac, int *pozwolenie, int *max_gle){
 			zajetych += zajety_teren[i + 1] - zajety_teren[i - d + 1];
 		i++;
 	}
-	
 }
 
