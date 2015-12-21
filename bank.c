@@ -54,8 +54,6 @@ int main(int argc, char **argv){
 	
 	
 	// Wysłanie wstępnych informacji do muzeum.
-	
-	// Pobranie informacji o ilości firm i ilości robotników w każdej firmie.
 	struct kom_1_z_banku_do_muzeum komunikat_do_muzeum1;
 	komunikat_do_muzeum1.ilosc_firm = iloscFirm;
 	komunikat_do_muzeum1.nr_porcja = 1;
@@ -114,6 +112,7 @@ int main(int argc, char **argv){
 			
 		}
 	}
+	free(LiczbaPracownikow);
 	free(Saldo);
 	return 0;
 }

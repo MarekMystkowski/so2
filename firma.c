@@ -7,7 +7,7 @@
 	
 int id_firmy, oplataStala, ograniczenieA, koncz_prace;
 int ilosc_pracownikow, saldo, ilu_robotnikow_pracuje;
-int kolekcja_firmowa[1000009];
+int kolekcja_firmowa[1000009], kierownik_w_pracy;
 int pozwolenie; // -1 - brak pozwolenia; wpf: mamy pozwolenie na pola [pozwoleinie,..]
 
 void PRACUJ(int symbol_zbioru, struct kom_do_delegata *odp);
@@ -29,6 +29,11 @@ void * kierownik(){
 	
 	pthread_mutex_lock( &mutex );
 	printf("firma %d :     P(mutex) kierownik\n", id_firmy ); 
+	kierownik_w_pracy = 1;
+	// Wzbudzenie robotników którzy rozpoczeli prace prze demną.
+	pthread_cond_broadcast(&oczekujacy_robotnicy);
+	printf("firma %d :     Wzbudz(robotnicy) kierownik\n", id_firmy ); 
+	
 	int i, j, x;
 	while(1){
 		printf("firma %d :     wait() kierownik\n", id_firmy ); 
@@ -47,6 +52,7 @@ void * kierownik(){
 					kolekcja_firmowa[i] -= i;
 					saldo+= i * 10;
 					j++;
+					printf("firma %d :     wyslanie sprzedarzy\n", id_firmy ); 
 				}
 			
 			// Odbieranie akceptacji tranzakcji.
@@ -57,12 +63,13 @@ void * kierownik(){
 				x = msgrcv(ID_KOLEJKI_FIRM, &komunikat, sizeof(komunikat),
 						adres_firmy(id_firmy, 0), 0);
 				if(x == -1)syserr("firma:Error in msgrcv\n");
+				printf("firma %d :     odebranie sprzedarzy\n", id_firmy ); 
 				assert(komunikat.jakie_zlecenie == 'A');
 			}
 			
 			// Jeśli ma jakieś pozwolenie to zwolń je.
 			if(pozwolenie != -1){
-				komunikat.jakie_zlecenie = 'Z';
+				komunikat_odp.jakie_zlecenie = 'Z';
 				x = msgsnd(ID_KOLEJKI_DELEGATOW, &komunikat_odp, sizeof(komunikat_odp),0);
 				if(x == -1)syserr("firma:Error in msgsnd\n");
 				
@@ -70,6 +77,11 @@ void * kierownik(){
 				x = msgrcv(ID_KOLEJKI_FIRM, &komunikat, sizeof(komunikat),
 						adres_firmy(id_firmy, 0), 0);
 				if(x == -1)syserr("firma:Error in msgrcv\n");
+				if(komunikat.jakie_zlecenie != 'Z'){
+					printf("firma %d :     zamiast zwolnienia jest: %c\n", id_firmy, komunikat.jakie_zlecenie);
+					
+					
+				}
 				assert(komunikat.jakie_zlecenie == 'Z');
 			}
 			pthread_mutex_lock( &mutex );
@@ -102,8 +114,14 @@ void * kierownik(){
 				}
 			}
 		}
+		ilu_robotnikow_pracuje = ilosc_pracownikow;
 		pthread_cond_broadcast(&oczekujacy_robotnicy);
 		printf("firma %d :     Wzbudz(robotnicy) kierownik\n", id_firmy ); 
+		if(pozwolenie == -1){
+			printf("firma %d :     V(mutex) kierownik\n", id_firmy ); 
+			pthread_mutex_unlock( &mutex );
+			return /*koniec pracy*/(NULL);
+		}
 		if(koncz_prace){
 			printf("firma %d :     V(mutex) kierownik\n", id_firmy ); 
 			pthread_mutex_unlock( &mutex );
@@ -122,31 +140,37 @@ void * pracownik(void *id){
 	komunikat_odp.ilosc_pol = ilosc_pracownikow;
 	
 	pthread_mutex_lock( &mutex );
-	printf("firma %d pr:%d :     P(mutex)\n", id_firmy, moje_id ); 
+	printf("firma %d pr:%d :     P(mutex)__1\n", id_firmy, moje_id ); 
 	
+	// Rozpoczełem prace przed kierownikiem, muszę poczekać.
+	if(!kierownik_w_pracy){
+		printf("firma %d pr:%d :     wait(robotnik)__2\n", id_firmy, moje_id ); 
+		pthread_cond_wait( &oczekujacy_robotnicy, &mutex );
+	}
 	// Jeden obrut pętli to jedno pozwolenie.
 	while(1){
 		ilu_robotnikow_pracuje--;
-		printf("firma %d pr:%d :     ilu_rob: %d\n", id_firmy, moje_id, ilu_robotnikow_pracuje); 
+		printf("firma %d pr:%d :     ilu_rob: %d__3\n", id_firmy, moje_id, ilu_robotnikow_pracuje); 
 		// Jeśli nie jestem ostatnim to wieszam się.
 		if(ilu_robotnikow_pracuje != 0){
-			printf("firma %d pr:%d :     wait(robotnik)\n", id_firmy, moje_id ); 
+			printf("firma %d pr:%d :     wait(robotnik)__4\n", id_firmy, moje_id ); 
 			pthread_cond_wait( &oczekujacy_robotnicy, &mutex );
-			ilu_robotnikow_pracuje++;
+			//ilu_robotnikow_pracuje++;
 		} else {
-			// Może trzeba wybudzić kierownika by zdobył nowe pozwolenie.
-			ilu_robotnikow_pracuje++; // dzięki temu nikt tu nie wejdzie gdy ja tu jestem.
+			// Trzeba wybudzić kierownika by zdobył nowe pozwolenie.
+			//ilu_robotnikow_pracuje++; // dzięki temu nikt tu nie wejdzie gdy ja tu jestem.
 			
 			// budzenie kierownika
-			printf("firma %d pr:%d :    signal(kierow)\n", id_firmy, moje_id ); 
+			printf("firma %d pr:%d :    signal(kierow)__5\n", id_firmy, moje_id ); 
 			pthread_cond_signal(&oczekujacy_kierownik);
-			printf("firma %d pr:%d :     wait(robotnik)\n", id_firmy, moje_id ); 
+			printf("firma %d pr:%d :     wait(robotnik)__6\n", id_firmy, moje_id ); 
 			pthread_cond_wait( &oczekujacy_robotnicy, &mutex );
 			
 		}
+		printf("firma %d pr:%d :     wybudzony robotnik__7\n", id_firmy, moje_id ); 
 		if(pozwolenie == -1){
-			ilu_robotnikow_pracuje--;
-			printf("firma %d pr:%d :     V(mutex)\n", id_firmy, moje_id ); 
+			//ilu_robotnikow_pracuje--;
+			printf("firma %d pr:%d :     V(mutex)__8\n", id_firmy, moje_id ); 
 			pthread_mutex_unlock( &mutex );
 			return /*Kończę pracę :D*/(NULL);
 		 }
@@ -155,8 +179,8 @@ void * pracownik(void *id){
 		while(1){
 			
 			if(koncz_prace){
-				ilu_robotnikow_pracuje--;
-				printf("firma %d pr:%d :     V(mutex)\n", id_firmy, moje_id ); 
+				//ilu_robotnikow_pracuje--;
+				printf("firma %d pr:%d :     V(mutex)__9\n", id_firmy, moje_id ); 
 				pthread_mutex_unlock( &mutex );
 				return /*Kończę pracę :D*/(NULL);
 			}
@@ -168,7 +192,7 @@ void * pracownik(void *id){
 			if(x == -1)syserr("firma:Error in msgsnd\n");
 			
 			// Zwalniam mutex.
-			printf("firma %d pr:%d :     V(mutex)\n", id_firmy, moje_id ); 
+			printf("firma %d pr:%d :     V(mutex)__10\n", id_firmy, moje_id ); 
 			pthread_mutex_unlock( &mutex );
 			
 			// Oczekuję odpowiedzi od delegata.
@@ -176,16 +200,16 @@ void * pracownik(void *id){
 					adres_firmy(id_firmy, moje_id), 0);
 			if(x == -1)syserr("firma:Error in msgrcv\n");
 			pthread_mutex_lock( &mutex );
-			printf("firma %d pr:%d :     P(mutex)\n", id_firmy, moje_id ); 
+			printf("firma %d pr:%d :     P(mutex)__11\n", id_firmy, moje_id ); 
 			
 			
 			if(komunikat.jakie_zlecenie == 'N'){
 				// Gdzy nie ma już nic do roboty.
-				ilu_robotnikow_pracuje--;
+				//ilu_robotnikow_pracuje--;
 				break /*Idę odpocząć :) */ ;	
 			} else if(komunikat.jakie_zlecenie == 'T'){
 				// Dostaliśmy działkę do przekopania.
-				printf("firma %d pr:%d :     V(mutex)\n", id_firmy, moje_id ); 
+				printf("firma %d pr:%d :     V(mutex)__12\n", id_firmy, moje_id ); 
 				pthread_mutex_unlock( &mutex );
 				
 				// Pracuję nad wykopaliskiem wynik zapisuje na komunikacie odp.
@@ -200,11 +224,11 @@ void * pracownik(void *id){
 				x = msgrcv(ID_KOLEJKI_FIRM, &komunikat, sizeof(komunikat),
 						adres_firmy(id_firmy, moje_id), 0);
 				if(x == -1)syserr("firma:Error in msgrcv\n");
-				if(komunikat.jakie_zlecenie != 'A')syserr("firma:robotnik źle pracuje\n");
+				if(komunikat.jakie_zlecenie != 'A')syserr("firma:robotnik zle pracuje\n");
 				
 				// Proces dodawania zatwierdzonych artefaktów:
 				pthread_mutex_lock( &mutex );
-				printf("firma %d pr:%d :     P(mutex)\n", id_firmy, moje_id ); 
+				printf("firma %d pr:%d :     P(mutex)__13\n", id_firmy, moje_id ); 
 				for(i = 0; i < komunikat_odp.ilosc_wykopanych_artefaktow; i++)
 					kolekcja_firmowa[komunikat_odp.wykopane_artefakty[i]]++;
 			}
@@ -243,7 +267,7 @@ int main(int argc, char **argv){
 	 // Stworzenie kierownika.
 	 pthread_create( &pth_kierownik, NULL, &kierownik, NULL);
 	ilu_robotnikow_pracuje = ilosc_pracownikow;
-	sleep(10);
+
 	// Stworzyć pracowników.
 	int i;
 	int indeksy[ilosc_pracownikow];

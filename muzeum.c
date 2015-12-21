@@ -77,6 +77,7 @@ void * delegat(void *id){
 				komunikat_b_odp.id1 = 0;
 				komunikat_b_odp.id2 = id_firmy;
 				komunikat_b_odp.kwota = komunikat.kolekcja * 10;
+				komunikat_b_odp.jakie_zlecenie = 'P';
 				x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_b_odp, sizeof(komunikat_b_odp),0);
 				if(x == -1)syserr("muzeum:Error in msgsnd\n");
 				
@@ -93,7 +94,7 @@ void * delegat(void *id){
 				break;
 			case 'Z':
 				// Firma zwalnia teren.
-				komunikat_odp.jakie_zlecenie = 'N';
+				komunikat_odp.jakie_zlecenie = 'Z';
 				if(pozwolenie == -1) break; // już zwolniony.
 				
 				pthread_mutex_lock( &mutex );
@@ -106,7 +107,6 @@ void * delegat(void *id){
 				
 				pozwolenie = -1;
 				maksymalna_glebokosc = -1;
-				komunikat_odp.jakie_zlecenie = 'Z'; // zwolniono.
 				break;
 				
 			case 'O':
@@ -143,7 +143,7 @@ void * delegat(void *id){
 					for(i = 0; i < ilosc_robotnikow[id_firmy]; i++)
 						zajety_teren[i + pozwolenie] = 1;
 					komunikat_odp.jakie_zlecenie = 'P';
-				}
+				} else maksymalna_glebokosc = -1;
 				
 				komunikat_odp.pozwolenie = pozwolenie;
 				break;
@@ -188,7 +188,7 @@ int main(int argc, char **argv){
 	x = msgrcv(ID_KOLEJKI_BANK_MUZEUM, &komunikat, sizeof(komunikat), 1, 0);
 	if(x == -1)syserr("muzeum:Error in msgrcv\n");
 	ilosc_firm = komunikat.ilosc_firm; 
-	ilosc_robotnikow = malloc(sizeof(int) * ilosc_firm);
+	ilosc_robotnikow = malloc(sizeof(int) * (ilosc_firm + 1));
 	
 	i = 0;
 	while(i * komunikat.rozmiar_porcji < ilosc_firm){
@@ -227,7 +227,7 @@ int main(int argc, char **argv){
 	
 	// poinformowanie banku by skończył działalność.
 	struct kom_do_banku komunikat_do_banku;
-	komunikat_do_banku.id_konta = 0;
+	komunikat_do_banku.id_konta = 1;
 	komunikat_do_banku.jakie_zlecenie = 'Z';
 	x = msgsnd(ID_KOLEJKI_BANK_MUZEUM, &komunikat_do_banku, sizeof(komunikat_do_banku), 0);
 	if(x == -1)syserr("muzeum:Error in msgrcv\n");
